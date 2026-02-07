@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState, useMemo, useLayoutEffect } from 'react';
 import { motion, AnimatePresence, Reorder } from 'framer-motion';
+import { createAvatar } from '@dicebear/core';
+import { glass } from '@dicebear/collection';
 import Announcement from "./components/Announcement";
 import zhifubaoImg from "./assets/zhifubao.jpg";
 import weixinImg from "./assets/weixin.jpg";
@@ -1788,6 +1790,14 @@ export default function HomePage() {
   const [loginSuccess, setLoginSuccess] = useState('');
   const [loginOtp, setLoginOtp] = useState('');
 
+  const userAvatar = useMemo(() => {
+    if (!user?.id) return '';
+    return createAvatar(glass, {
+      seed: user.id,
+      size: 80
+    }).toDataUri();
+  }, [user?.id]);
+
   // 反馈弹窗状态
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [feedbackNonce, setFeedbackNonce] = useState(0);
@@ -2454,6 +2464,13 @@ export default function HomePage() {
   // 登出
   const handleLogout = async () => {
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        await supabase.auth.signOut({ scope: 'local' });
+        setUserMenuOpen(false);
+        setUser(null);
+        return;
+      }
       const { error } = await supabase.auth.signOut();
       if (error?.code === 'session_not_found') {
         await supabase.auth.signOut({ scope: 'local' });
@@ -3477,17 +3494,8 @@ export default function HomePage() {
           >
             <RefreshIcon className={refreshing ? 'spin' : ''} width="18" height="18" />
           </button>
-          <button
-            className="icon-button"
-            aria-label="打开设置"
-            onClick={() => setSettingsOpen(true)}
-            title="设置"
-          >
-            <SettingsIcon width="18" height="18" />
-          </button>
-
-          {/* 临时隐藏用户菜单入口 */}
-          <div className="user-menu-container" ref={userMenuRef} hidden>
+          {/* 用户菜单 */}
+          <div className="user-menu-container" ref={userMenuRef}>
             <button
               className={`icon-button user-menu-trigger ${user ? 'logged-in' : ''}`}
               aria-label={user ? '用户菜单' : '登录'}
@@ -3496,7 +3504,15 @@ export default function HomePage() {
             >
               {user ? (
                 <div className="user-avatar-small">
-                  {user.email?.charAt(0).toUpperCase() || 'U'}
+                  {userAvatar ? (
+                    <img
+                      src={userAvatar}
+                      alt="用户头像"
+                      style={{ width: '100%', height: '100%', borderRadius: '50%' }}
+                    />
+                  ) : (
+                    (user.email?.charAt(0).toUpperCase() || 'U')
+                  )}
                 </div>
               ) : (
                 <UserIcon width="18" height="18" />
@@ -3517,7 +3533,15 @@ export default function HomePage() {
                     <>
                       <div className="user-menu-header">
                         <div className="user-avatar-large">
-                          {user.email?.charAt(0).toUpperCase() || 'U'}
+                          {userAvatar ? (
+                            <img
+                              src={userAvatar}
+                              alt="用户头像"
+                              style={{ width: '100%', height: '100%', borderRadius: '50%' }}
+                            />
+                          ) : (
+                            (user.email?.charAt(0).toUpperCase() || 'U')
+                          )}
                         </div>
                         <div className="user-info">
                           <span className="user-email">{user.email}</span>
@@ -3609,7 +3633,12 @@ export default function HomePage() {
                 />
                 {isSearching && <div className="search-spinner" />}
               </div>
-              <button className="button" type="submit" disabled={loading}>
+              <button
+                className="button"
+                type="submit"
+                disabled={loading || refreshing}
+                style={{pointerEvents: refreshing ? 'none' : 'auto', opacity: refreshing ? 0.6 : 1}}
+              >
                 {loading ? '添加中…' : '添加'}
               </button>
             </form>
